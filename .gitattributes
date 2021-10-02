@@ -1,0 +1,4 @@
+*.js linguist-language=go
+*.js    eol=lf
+*.jsx   eol=lf
+*.json  eol=lf
