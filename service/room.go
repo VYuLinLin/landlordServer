@@ -64,7 +64,7 @@ func (r *Room) newTable(client *Client) (table *Table) {
 	return
 }
 
-//func init()  {
+//func config()  {
 //	go func() {		//压测
 //		time.Sleep(time.Second * 3)
 //		for i:=0;i<1;i++{

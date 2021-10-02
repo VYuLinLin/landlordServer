@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/astaxie/beego/logs"
 	"io"
+	"landlord/conf"
 	_ "landlord/router"
 	"net/http"
 	"os"
@@ -12,26 +13,26 @@ import (
 )
 
 func main() {
-	err := initConf()
+	err := conf.InitConf()
 	if err != nil {
 		logs.Error("init conf err:%v", err)
 		return
 	}
 	defer func() {
-		if gameConf.Db != nil {
-			err = gameConf.Db.Close()
+		if conf.GameConf.Db != nil {
+			err = conf.GameConf.Db.Close()
 			if err != nil {
 				logs.Error("main close sqllite db err :%v", err)
 			}
 		}
 	}()
-	err = initSec()
+	err = conf.InitSec()
 	if err != nil {
 		logs.Error("init sec err:%v", err)
 		return
 	}
 
-	var addr = flag.String("addr", fmt.Sprintf(":%d", gameConf.HttpPort), "http service address")
+	var addr = flag.String("addr", fmt.Sprintf(":%d", conf.GameConf.HttpPort), "http service address")
 	err = http.ListenAndServe(*addr, nil)
 	if err != nil {
 		logs.Error("ListenAndServe: err:%v", err)

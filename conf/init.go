@@ -1,4 +1,4 @@
-package main
+package conf
 
 import (
 	"database/sql"
@@ -24,8 +24,8 @@ func conversionLogLevel(logLevel string) int {
 
 func initLogger() (err error) {
 	config := make(map[string]interface{})
-	config["filename"] = gameConf.LogPath
-	config["level"] = conversionLogLevel(gameConf.LogLevel)
+	config["filename"] = GameConf.LogPath
+	config["level"] = conversionLogLevel(GameConf.LogLevel)
 
 	configStr, err := json.Marshal(config)
 	if err != nil {
@@ -40,13 +40,13 @@ func initLogger() (err error) {
 }
 
 func initSqlite() (err error) {
-	gameConf.Db, err = sql.Open("sqlite3", gameConf.DbPath)
+	GameConf.Db, err = sql.Open("sqlite3", GameConf.DbPath)
 	if err != nil {
 		logs.Error("initSqlite err : %v", err)
 		return
 	}
 	var stmt *sql.Stmt
-	stmt, err = gameConf.Db.Prepare(`CREATE TABLE IF NOT EXISTS "account" ("id" INTEGER NOT NULL,"email" text(32),"username" TEXT(16),"password" TEXT(32),"coin" integer,"created_date" TEXT(32),"updated_date" TEXT(32),PRIMARY KEY ("id"))`)
+	stmt, err = GameConf.Db.Prepare(`CREATE TABLE IF NOT EXISTS "account" ("id" INTEGER NOT NULL,"email" text(32),"username" TEXT(16),"password" TEXT(32),"coin" integer,"created_date" TEXT(32),"updated_date" TEXT(32),PRIMARY KEY ("id"))`)
 	if err != nil {
 		logs.Error("initSqlite err : %v", err)
 		return
@@ -59,7 +59,7 @@ func initSqlite() (err error) {
 	return
 }
 
-func initSec() (err error) {
+func InitSec() (err error) {
 	err = initLogger()
 	if err != nil {
 		logs.Error("init logger failed,err:%v", err)
