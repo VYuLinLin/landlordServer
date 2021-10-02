@@ -1,2 +1,12 @@
-
-2021/10/02 11:49:54.792 [I]  init sec succ
+2021/10/02 13:45:18.653 [E]  initSqlite err : unable to open database file: The system cannot find the path specified.
+2021/10/02 13:45:18.653 [E]  init sqlite failed,err:unable to open database file: The system cannot find the path specified.
+2021/10/02 13:45:18.653 [E]  init sec err:unable to open database file: The system cannot find the path specified.
+2021/10/02 13:48:47.926 [I]  init sec succ
+2021/10/02 13:48:52.715 [E]  user request Index - get cookie err: http: named cookie not present
+2021/10/02 13:48:52.715 [E]  user request Index - get cookie err: http: named cookie not present
+2021/10/02 13:48:52.715 [D]  user request Index - userId []
+2021/10/02 13:48:52.715 [D]  user request Index - username []
+2021/10/02 13:48:52.796 [E]  user request Index - get cookie err: http: named cookie not present
+2021/10/02 13:48:52.796 [E]  user request Index - get cookie err: http: named cookie not present
+2021/10/02 13:48:52.796 [D]  user request Index - userId []
+2021/10/02 13:48:52.796 [D]  user request Index - username []
