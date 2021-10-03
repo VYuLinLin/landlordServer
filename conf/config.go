@@ -32,7 +32,7 @@ func InitConf() (err error) {
 
 	logs.Debug("read conf succ , http port : %v", GameConf.HttpPort)
 
-	//todo 日志配置
+	//todo log config
 	GameConf.LogPath = conf.String(environment + "log_path")
 	if len(GameConf.LogPath) == 0 {
 		GameConf.LogPath = "./logs/game.log"
@@ -45,7 +45,7 @@ func InitConf() (err error) {
 	}
 	logs.Debug("read conf succ , LogLevel :  %v", GameConf.LogLevel)
 
-	//todo sqlite配置
+	//todo sqlite config
 	GameConf.DbPath = conf.String(environment + "db_path")
 	if len(GameConf.DbPath) == 0 {
 		GameConf.DbPath = "./db/landlord.db"

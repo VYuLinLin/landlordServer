@@ -22,7 +22,7 @@ func main() {
 		if conf.GameConf.Db != nil {
 			err = conf.GameConf.Db.Close()
 			if err != nil {
-				logs.Error("main close sqllite db err :%v", err)
+				logs.Error("main close sqlite3 db err :%v", err)
 			}
 		}
 	}()

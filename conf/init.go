@@ -29,12 +29,12 @@ func initLogger() (err error) {
 
 	configStr, err := json.Marshal(config)
 	if err != nil {
-		fmt.Println("marsha1 faild,err", err)
+		fmt.Println("marsha1 failed,err", err)
 		return
 	}
 	err = logs.SetLogger(logs.AdapterFile, string(configStr))
 	if err != nil {
-		logs.Error("init logger :%v", err)
+		logs.Error("init logger failed:%v", err)
 	}
 	return
 }
@@ -70,6 +70,6 @@ func InitSec() (err error) {
 		logs.Error("init sqlite failed,err:%v", err)
 		return
 	}
-	logs.Info("init sec succ")
+	logs.Info("init sec success")
 	return
 }
