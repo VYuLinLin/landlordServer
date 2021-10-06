@@ -1,0 +1,13 @@
+2021/10/02 16:48:23.392 [I]  init sec succ
+2021/10/02 16:48:26.368 [E]  user request Index - get cookie err: http: named cookie not present
+2021/10/02 16:48:26.368 [E]  user request Index - get cookie err: http: named cookie not present
+2021/10/02 16:48:26.368 [D]  user request Index - userId []
+2021/10/02 16:48:26.368 [D]  user request Index - username []
+2021/10/02 16:48:26.436 [E]  user request Index - get cookie err: http: named cookie not present
+2021/10/02 16:48:26.436 [E]  user request Index - get cookie err: http: named cookie not present
+2021/10/02 16:48:26.436 [D]  user request Index - userId []
+2021/10/02 16:48:26.436 [D]  user request Index - username []
+2021/10/05 12:30:31.618 [I]  init sec success
+2021/10/05 13:58:14.313 [I]  init sec success
+2021/10/05 13:58:50.480 [I]  init sec success
+2021/10/05 14:07:42.190 [I]  init sec success
