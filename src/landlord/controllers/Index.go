@@ -2,11 +2,12 @@ package controllers
 
 import (
 	"encoding/json"
-	"github.com/astaxie/beego/logs"
 	"html/template"
 	"landlord/common"
 	"net/http"
 	"strconv"
+
+	"github.com/astaxie/beego/logs"
 )
 
 func Index(w http.ResponseWriter, r *http.Request) {

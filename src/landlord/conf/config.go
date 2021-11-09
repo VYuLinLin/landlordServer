@@ -1,10 +1,11 @@
 package conf
 
 import (
-	"github.com/astaxie/beego/config"
-	"github.com/astaxie/beego/logs"
 	"landlord/common"
 	"os"
+
+	"github.com/astaxie/beego/config"
+	"github.com/astaxie/beego/logs"
 )
 
 var (

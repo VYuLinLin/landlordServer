@@ -3,13 +3,14 @@ package main // import "landlord"
 import (
 	"flag"
 	"fmt"
-	"github.com/astaxie/beego/logs"
 	"io"
 	"landlord/conf"
 	_ "landlord/router"
 	"net/http"
 	"os"
 	"strconv"
+
+	"github.com/astaxie/beego/logs"
 )
 
 func main() {
@@ -39,7 +40,8 @@ func main() {
 	}
 }
 
-func init() { //生成pid文件，保存pid
+// 保存pid，如果获取失败，则创建文件夹或新文件
+func init() {
 	pidFileName := "pid"
 	fileInfo, err := os.Stat(pidFileName)
 	if err != nil {

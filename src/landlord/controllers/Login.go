@@ -2,21 +2,28 @@ package controllers
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
-	"github.com/astaxie/beego/logs"
 	"landlord/common"
 	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/astaxie/beego/logs"
 )
 
 func Login(w http.ResponseWriter, r *http.Request) {
+	var data interface{}
+	res := make(map[string]interface{})
 	defer func() {
-		if r := recover(); r != nil {
-			logs.Error("user request Login - Login panic:%v ", r)
+		// w.Header().Set("Access-Control-Allow-Origin", "*")
+		res["data"] = data
+		if _, ok := data.(string); ok {
+			res["status"] = false
+		} else {
+			res["status"] = true
 		}
-	}()
-	var ret = []byte{'1'}
-	defer func() {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		ret, _ := json.Marshal(res)
 		_, err := w.Write(ret)
 		if err != nil {
 			logs.Error("")
@@ -26,7 +33,8 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	if len(email) == 0 {
 		email = r.PostFormValue("email")
 		if email == "" {
-			logs.Error("user request Login - err: email is empty")
+			data = "user request Login - err: email is empty"
+			logs.Error(data)
 			return
 		}
 	}
@@ -34,7 +42,8 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	if len(password) == 0 {
 		password = r.PostFormValue("password")
 		if password == "" {
-			logs.Error("user request Login - err: password is empty")
+			data = "user request Login - err: password is empty"
+			logs.Error(data)
 			return
 		}
 	}
@@ -45,10 +54,28 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	if row != nil {
 		err := row.Scan(&account.Id, &account.Email, &account.Username, &account.Password, &account.Coin, &account.CreatedDate, &account.UpdateDate)
 		if err != nil {
-			cookie := http.Cookie{Name: "userid", Value: string(account.Id), Path: "/", MaxAge: 86400}
-			http.SetCookie(w, &cookie)
-			cookie = http.Cookie{Name: "username", Value: account.Username, Path: "/", MaxAge: 86400}
-			http.SetCookie(w, &cookie)
+			data = fmt.Sprintf("user [%v] scan err: %v", email, err)
+			logs.Debug(data)
+			return
 		}
+		if account.Id != 0 {
+			now := time.Now().Format("2006-01-02 15:04:05")
+			_, err := common.GameConfInfo.Db.Exec("UPDATE account SET updated_date = ? WHERE id = ?", now, account.Id)
+			if err != nil {
+				data = fmt.Sprintf("user [%v] update err: %v", email, err)
+				logs.Error(data)
+				return
+			}
+		}
+
+		cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(int(account.Id)), Path: "/", MaxAge: 86400}
+		http.SetCookie(w, &cookie)
+		cookie = http.Cookie{Name: "username", Value: account.Username, Path: "/", MaxAge: 86400}
+		http.SetCookie(w, &cookie)
+
+		data = account
+	} else {
+		data = fmt.Sprintf("user [%v] request err: user does not exist", email)
+		logs.Debug(data)
 	}
 }

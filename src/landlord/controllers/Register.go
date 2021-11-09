@@ -4,22 +4,27 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"github.com/astaxie/beego/logs"
 	"landlord/common"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/astaxie/beego/logs"
 )
 
 func Register(w http.ResponseWriter, r *http.Request) {
+	var data interface{}
+	res := make(map[string]interface{})
+
 	defer func() {
-		if r := recover(); r != nil {
-			logs.Error("Register panic:%v ", r)
+		// w.Header().Set("Access-Control-Allow-Origin", "*")
+		res["data"] = data
+		if _, ok := data.(string); ok {
+			res["status"] = false
+		} else {
+			res["status"] = true
 		}
-	}()
-	var ret = []byte{'1'}
-	defer func() {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		ret, _ := json.Marshal(res)
 		_, err := w.Write(ret)
 		if err != nil {
 			logs.Error("user request Register - err : %v", err)
@@ -29,7 +34,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	if len(username) == 0 {
 		username = r.PostFormValue("username")
 		if username == "" {
-			logs.Error("register err: username is empty")
+			data = "register err: username is empty"
+			logs.Error(data)
 			return
 		}
 	}
@@ -37,7 +43,8 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	if len(password) == 0 {
 		password = r.PostFormValue("password")
 		if password == "" {
-			logs.Error("register err: password is empty")
+			data = "register err: password is empty"
+			logs.Error(data)
 			return
 		}
 	}
@@ -51,29 +58,38 @@ func Register(w http.ResponseWriter, r *http.Request) {
 		md5Password := fmt.Sprintf("%x", md5.Sum([]byte(password)))
 		stmt, err := common.GameConfInfo.Db.Prepare(`insert into account(email,username,password,coin,created_date,updated_date) values(?,?,?,?,?,?) `)
 		if err != nil {
-			logs.Error("insert new account [%v] err : %v", username, err)
+			data = fmt.Sprintf("insert into account [%v] err : %v", username, err)
+			logs.Error(data)
 			return
 		}
+		defer stmt.Close()
 		result, err := stmt.Exec(username, username, md5Password, 10000, now, now)
 		if err != nil {
-			logs.Error("insert new account [%v] err : %v", username, err)
+			data = fmt.Sprintf("insert new account [%v] err : %v", username, err)
+			logs.Error(data)
 			return
 		}
 		lastInsertId, err := result.LastInsertId()
 		if err != nil {
-			logs.Error("insert new account [%v] get last insert id err : %v", username, err)
+			data = fmt.Sprintf("insert new account [%v] get last insert id err : %v", username, err)
+			logs.Error(data)
 			return
 		}
-		ret, err = json.Marshal(map[string]interface{}{"uid": lastInsertId, "username": username})
-		if err != nil {
-			logs.Error("json marsha1 failed err:%v", err)
-			return
-		}
+
 		cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(int(lastInsertId)), Path: "/", MaxAge: 86400}
 		http.SetCookie(w, &cookie)
 		cookie = http.Cookie{Name: "username", Value: username, Path: "/", MaxAge: 86400}
 		http.SetCookie(w, &cookie)
+
+		data = map[string]interface{}{
+			"uid":          lastInsertId,
+			"username":     username,
+			"coin":         1000,
+			"created_date": now,
+			"updated_date": now,
+		}
 	} else {
-		logs.Debug("user [%v] request register err: user already exists", username)
+		data = fmt.Sprintf("user [%v] request register err: user already exists", username)
+		logs.Debug(data)
 	}
 }
