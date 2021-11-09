@@ -12,7 +12,7 @@ type HandleFunc func(http.ResponseWriter, *http.Request)
 func init() {
 	http.HandleFunc("/", logPanics(controllers.Index))
 	http.HandleFunc("/login", logPanics(controllers.Login))
-	http.HandleFunc("/loginOut", logPanics(controllers.LoginOut))
+	http.HandleFunc("/logout", logPanics(controllers.LoginOut))
 	http.HandleFunc("/reg", logPanics(controllers.Register))
 
 	http.HandleFunc("/ws", service.ServeWs)
