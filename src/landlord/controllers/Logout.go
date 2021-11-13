@@ -46,10 +46,9 @@ func LoginOut(w http.ResponseWriter, r *http.Request) {
 		logs.Debug(data)
 		return
 	} else {
-		cookie := http.Cookie{Name: "userid", Path: "/", MaxAge: -1}
+		cookie := http.Cookie{Name: "userid", HttpOnly: true, MaxAge: -1}
 		http.SetCookie(w, &cookie)
-		cookie = http.Cookie{Name: "username", Path: "/", MaxAge: -1}
+		cookie = http.Cookie{Name: "username", HttpOnly: true, MaxAge: -1}
 		http.SetCookie(w, &cookie)
 	}
-
 }

@@ -14,7 +14,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
 	ret := make(map[string]interface{})
 	t, err := template.ParseFiles("templates/index.html")
 	if err != nil {
-		logs.Error("user request Index - can't find template file %s", "templates/poker.html")
+		logs.Error("user request Index - can't find template file %s", "templates/index.html")
 		return
 	}
 	userId := ""

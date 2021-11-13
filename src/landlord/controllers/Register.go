@@ -76,9 +76,9 @@ func Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(int(lastInsertId)), Path: "/", MaxAge: 86400}
+		cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(int(lastInsertId)), HttpOnly: true, MaxAge: 86400}
 		http.SetCookie(w, &cookie)
-		cookie = http.Cookie{Name: "username", Value: username, Path: "/", MaxAge: 86400}
+		cookie = http.Cookie{Name: "username", Value: username, HttpOnly: true, MaxAge: 86400}
 		http.SetCookie(w, &cookie)
 
 		data = map[string]interface{}{

@@ -68,9 +68,9 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(int(account.Id)), Path: "/", MaxAge: 86400}
+		cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(int(account.Id)), HttpOnly: true, MaxAge: 86400}
 		http.SetCookie(w, &cookie)
-		cookie = http.Cookie{Name: "username", Value: account.Username, Path: "/", MaxAge: 86400}
+		cookie = http.Cookie{Name: "username", Value: account.Username, HttpOnly: true, MaxAge: 86400}
 		http.SetCookie(w, &cookie)
 
 		data = account

@@ -7,5 +7,18 @@
 <body>
 <h1>welcome to landlord</h1>
 <h2>hahhahahaha...</h2>
+<h3>{{ .user }}</h3>
+<input id="user" type="hidden" value="{{.user}}">
+<script>
+(function () {
+    var jsonVal = document.getElementById("user").value;
+    console.log(JSON.parse(jsonVal))
+    console.log(JSON.parse({{.user}}))
+    console.log('{user}')
+    console.log({{.port}})
+
+    window.localStorage.setItem("port",{{.port}});
+})();
+</script>
 </body>
 </html>
