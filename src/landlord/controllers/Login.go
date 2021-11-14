@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"landlord/common"
 	"net/http"
 	"strconv"
@@ -12,16 +13,23 @@ import (
 	"github.com/astaxie/beego/logs"
 )
 
+type reqData struct {
+	Account  string
+	Password string
+}
+
 func Login(w http.ResponseWriter, r *http.Request) {
 	var data interface{}
-	res := make(map[string]interface{})
+	var msg string = "ok"
+
 	defer func() {
-		// w.Header().Set("Access-Control-Allow-Origin", "*")
-		res["data"] = data
-		if _, ok := data.(string); ok {
-			res["status"] = false
-		} else {
-			res["status"] = true
+		res := common.Response{
+			0,
+			msg,
+			data,
+		}
+		if data == nil {
+			res.Code = 20001
 		}
 		ret, _ := json.Marshal(res)
 		_, err := w.Write(ret)
@@ -29,53 +37,52 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			logs.Error("")
 		}
 	}()
-	email := r.FormValue("email")
-	if len(email) == 0 {
-		email = r.PostFormValue("email")
-		if email == "" {
-			data = "user request Login - err: email is empty"
-			logs.Error(data)
-			return
-		}
+
+	defer r.Body.Close()
+	reqByte, _ := ioutil.ReadAll(r.Body)
+	reqData := &reqData{}
+	json.Unmarshal(reqByte, reqData)
+
+	account := reqData.Account
+	if account == "" {
+		msg = "user request Login - err: account is empty"
+		logs.Error(msg)
+		return
 	}
-	password := r.FormValue("password")
-	if len(password) == 0 {
-		password = r.PostFormValue("password")
-		if password == "" {
-			data = "user request Login - err: password is empty"
-			logs.Error(data)
-			return
-		}
+	password := reqData.Password
+	if password == "" {
+		msg = "user request Login - err: password is empty"
+		logs.Error(msg)
+		return
 	}
 	md5Password := fmt.Sprintf("%x", md5.Sum([]byte(password)))
-	var account = common.Account{}
-	//err := common.GameConfInfo.MysqlConf.Pool.Get(&account, "select * from account where username=? and password", email,md5Password)
-	row := common.GameConfInfo.Db.QueryRow("SELECT * FROM `account` WHERE username=? AND password=?", email, md5Password)
+	userInfo := common.Account{}
+	row := common.GameConfInfo.Db.QueryRow("SELECT * FROM `account` WHERE username=? AND password=?", account, md5Password)
 	if row != nil {
-		err := row.Scan(&account.Id, &account.Email, &account.Username, &account.Password, &account.Coin, &account.CreatedDate, &account.UpdateDate)
+		err := row.Scan(&userInfo.Id, &userInfo.Email, &userInfo.Username, &userInfo.Password, &userInfo.Coin, &userInfo.CreatedDate, &userInfo.UpdateDate)
 		if err != nil {
-			data = fmt.Sprintf("user [%v] scan err: %v", email, err)
-			logs.Debug(data)
+			msg = fmt.Sprintf("user [%v] scan err: %v", account, err)
+			logs.Debug(msg)
 			return
 		}
-		if account.Id != 0 {
+		if userInfo.Id != 0 {
 			now := time.Now().Format("2006-01-02 15:04:05")
-			_, err := common.GameConfInfo.Db.Exec("UPDATE account SET updated_date = ? WHERE id = ?", now, account.Id)
+			_, err := common.GameConfInfo.Db.Exec("UPDATE account SET updated_date = ? WHERE id = ?", now, userInfo.Id)
 			if err != nil {
-				data = fmt.Sprintf("user [%v] update err: %v", email, err)
-				logs.Error(data)
+				msg = fmt.Sprintf("user [%v] update err: %v", account, err)
+				logs.Error(msg)
 				return
 			}
 		}
 
-		cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(int(account.Id)), HttpOnly: true, MaxAge: 86400}
+		cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(int(userInfo.Id)), HttpOnly: true, MaxAge: 86400}
 		http.SetCookie(w, &cookie)
-		cookie = http.Cookie{Name: "username", Value: account.Username, HttpOnly: true, MaxAge: 86400}
+		cookie = http.Cookie{Name: "username", Value: userInfo.Username, HttpOnly: true, MaxAge: 86400}
 		http.SetCookie(w, &cookie)
 
-		data = account
+		data = userInfo
 	} else {
-		data = fmt.Sprintf("user [%v] request err: user does not exist", email)
-		logs.Debug(data)
+		msg = fmt.Sprintf("user [%v] request err: user does not exist", account)
+		logs.Debug(msg)
 	}
 }

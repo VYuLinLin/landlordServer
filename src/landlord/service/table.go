@@ -2,12 +2,13 @@ package service
 
 import (
 	"fmt"
-	"github.com/astaxie/beego/logs"
 	"landlord/common"
 	"math/rand"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/astaxie/beego/logs"
 )
 
 type TableId int

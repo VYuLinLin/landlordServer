@@ -3,12 +3,13 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/astaxie/beego/logs"
-	"github.com/gorilla/websocket"
 	"landlord/common"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/astaxie/beego/logs"
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -201,7 +202,6 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 		logs.Error("upgrader err:%v", err)
 		return
 	}
-	client := &Client{conn: conn, HandPokers: make([]int, 0, 21), UserInfo: &UserInfo{}}
 	var userId int
 	var username string
 	cookie, err := r.Cookie("userid")
@@ -209,8 +209,7 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logs.Error("get cookie err: %v", err)
 	} else {
-		userIdStr := cookie.Value
-		userId, err = strconv.Atoi(userIdStr)
+		userId, err = strconv.Atoi(cookie.Value)
 	}
 	cookie, err = r.Cookie("username")
 
@@ -220,6 +219,7 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 		username = cookie.Value
 	}
 
+	client := &Client{conn: conn, HandPokers: make([]int, 0, 21), UserInfo: &UserInfo{}}
 	if userId != 0 && username != "" {
 		client.UserInfo.UserId = UserId(userId)
 		client.UserInfo.Username = username

@@ -13,7 +13,7 @@ func init() {
 	http.HandleFunc("/", logPanics(controllers.Index))
 	http.HandleFunc("/login", logPanics(controllers.Login))
 	http.HandleFunc("/logout", logPanics(controllers.LoginOut))
-	http.HandleFunc("/reg", logPanics(controllers.Register))
+	http.HandleFunc("/register", logPanics(controllers.Register))
 
 	http.HandleFunc("/ws", service.ServeWs)
 
@@ -31,6 +31,16 @@ func logPanics(f HandleFunc) HandleFunc {
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			}
 		}()
-		f(w, req)
+		// 跨域请求时，允许头部携带cookie，设置后Access-Control-Allow-Origin值不能是“*”
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Origin", "http://172.21.165.80:7456")
+		//w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Content-Type", "application/json;charset=utf-8")
+		if req.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			f(w, req)
+		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"landlord/common"
 	"net/http"
 	"strconv"
@@ -14,15 +15,16 @@ import (
 
 func Register(w http.ResponseWriter, r *http.Request) {
 	var data interface{}
-	res := make(map[string]interface{})
+	var msg string = "ok"
 
 	defer func() {
-		// w.Header().Set("Access-Control-Allow-Origin", "*")
-		res["data"] = data
-		if _, ok := data.(string); ok {
-			res["status"] = false
-		} else {
-			res["status"] = true
+		res := common.Response{
+			0,
+			msg,
+			data,
+		}
+		if data == nil {
+			res.Code = 20001
 		}
 		ret, _ := json.Marshal(res)
 		_, err := w.Write(ret)
@@ -30,66 +32,66 @@ func Register(w http.ResponseWriter, r *http.Request) {
 			logs.Error("user request Register - err : %v", err)
 		}
 	}()
-	username := r.FormValue("username")
-	if len(username) == 0 {
-		username = r.PostFormValue("username")
-		if username == "" {
-			data = "register err: username is empty"
-			logs.Error(data)
-			return
-		}
-	}
-	password := r.FormValue("password")
-	if len(password) == 0 {
-		password = r.PostFormValue("password")
-		if password == "" {
-			data = "register err: password is empty"
-			logs.Error(data)
-			return
-		}
-	}
-	logs.Debug("user request register : username=%v, password=%v ", username, password)
+	defer r.Body.Close()
+	reqByte, _ := ioutil.ReadAll(r.Body)
+	reqData := &reqData{}
+	json.Unmarshal(reqByte, reqData)
 
-	var account = common.Account{}
-	row := common.GameConfInfo.Db.QueryRow("select * from account where username=?", username)
-	err := row.Scan(&account.Id, &account.Email, &account.Username, &account.Password, &account.Coin, &account.CreatedDate, &account.UpdateDate)
+	account := reqData.Account
+	if account == "" {
+		msg = "register err: account is empty"
+		logs.Error(msg)
+		return
+	}
+
+	password := reqData.Password
+	if password == "" {
+		msg = "register err: password is empty"
+		logs.Error(msg)
+		return
+	}
+	logs.Debug("user request register : account=%v, password=%v ", account, password)
+
+	userInfo := common.Account{}
+	row := common.GameConfInfo.Db.QueryRow("select * from account where username=?", account)
+	err := row.Scan(&userInfo.Id, &userInfo.Email, &userInfo.Username, &userInfo.Password, &userInfo.Coin, &userInfo.CreatedDate, &userInfo.UpdateDate)
 	if err != nil {
 		now := time.Now().Format("2006-01-02 15:04:05")
 		md5Password := fmt.Sprintf("%x", md5.Sum([]byte(password)))
 		stmt, err := common.GameConfInfo.Db.Prepare(`insert into account(email,username,password,coin,created_date,updated_date) values(?,?,?,?,?,?) `)
 		if err != nil {
-			data = fmt.Sprintf("insert into account [%v] err : %v", username, err)
-			logs.Error(data)
+			msg = fmt.Sprintf("insert into account [%v] err : %v", account, err)
+			logs.Error(msg)
 			return
 		}
 		defer stmt.Close()
-		result, err := stmt.Exec(username, username, md5Password, 10000, now, now)
+		result, err := stmt.Exec(account, account, md5Password, 10000, now, now)
 		if err != nil {
-			data = fmt.Sprintf("insert new account [%v] err : %v", username, err)
-			logs.Error(data)
+			msg = fmt.Sprintf("insert new account [%v] err : %v", account, err)
+			logs.Error(msg)
 			return
 		}
 		lastInsertId, err := result.LastInsertId()
 		if err != nil {
-			data = fmt.Sprintf("insert new account [%v] get last insert id err : %v", username, err)
-			logs.Error(data)
+			msg = fmt.Sprintf("insert new account [%v] get last insert id err : %v", account, err)
+			logs.Error(msg)
 			return
 		}
 
 		cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(int(lastInsertId)), HttpOnly: true, MaxAge: 86400}
 		http.SetCookie(w, &cookie)
-		cookie = http.Cookie{Name: "username", Value: username, HttpOnly: true, MaxAge: 86400}
+		cookie = http.Cookie{Name: "username", Value: account, HttpOnly: true, MaxAge: 86400}
 		http.SetCookie(w, &cookie)
 
 		data = map[string]interface{}{
-			"uid":          lastInsertId,
-			"username":     username,
+			"id":           lastInsertId,
+			"username":     account,
 			"coin":         1000,
 			"created_date": now,
 			"updated_date": now,
 		}
 	} else {
-		data = fmt.Sprintf("user [%v] request register err: user already exists", username)
-		logs.Debug(data)
+		msg = "register err: user already exists"
+		logs.Debug(msg)
 	}
 }

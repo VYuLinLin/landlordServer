@@ -1,8 +1,9 @@
 package service
 
 import (
-	"github.com/astaxie/beego/logs"
 	"sync"
+
+	"github.com/astaxie/beego/logs"
 )
 
 var (
