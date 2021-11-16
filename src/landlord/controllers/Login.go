@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"landlord/common"
 	"net/http"
@@ -20,13 +21,12 @@ type reqData struct {
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	var data interface{}
-	var msg string = "ok"
+	var msg = "ok"
 
 	defer func() {
 		res := common.Response{
-			0,
-			msg,
-			data,
+			Msg:  msg,
+			Data: data,
 		}
 		if data == nil {
 			res.Code = 20001
@@ -34,14 +34,24 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		ret, _ := json.Marshal(res)
 		_, err := w.Write(ret)
 		if err != nil {
-			logs.Error("")
+			logs.Error("login - err : %v", err)
 		}
 	}()
 
-	defer r.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			
+		}
+	}(r.Body)
 	reqByte, _ := ioutil.ReadAll(r.Body)
 	reqData := &reqData{}
-	json.Unmarshal(reqByte, reqData)
+	err := json.Unmarshal(reqByte, reqData)
+	if err != nil {
+		msg = fmt.Sprintf("json unmarshal err : %v", err)
+		logs.Error(msg)
+		return 
+	}
 
 	account := reqData.Account
 	if account == "" {
@@ -56,33 +66,31 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	md5Password := fmt.Sprintf("%x", md5.Sum([]byte(password)))
-	userInfo := common.Account{}
-	row := common.GameConfInfo.Db.QueryRow("SELECT * FROM `account` WHERE username=? AND password=?", account, md5Password)
-	if row != nil {
-		err := row.Scan(&userInfo.Id, &userInfo.Email, &userInfo.Username, &userInfo.Password, &userInfo.Coin, &userInfo.CreatedDate, &userInfo.UpdateDate)
+
+	userData := map[string]interface{}{
+		"username": account,
+		"password": md5Password,
+	}
+	userInfo, err := common.UserInfo(userData)
+	if err != nil {
+		msg = fmt.Sprintf("user [%v] scan err: %v", account, err)
+		logs.Debug(msg)
+		return
+	}
+	if userInfo.Id != 0 {
+		now := time.Now().Format("2006-01-02 15:04:05")
+		_, err := common.GameConfInfo.Db.Exec("UPDATE account SET updated_date = ? WHERE id = ?", now, userInfo.Id)
 		if err != nil {
-			msg = fmt.Sprintf("user [%v] scan err: %v", account, err)
-			logs.Debug(msg)
+			msg = fmt.Sprintf("user [%v] update err: %v", account, err)
+			logs.Error(msg)
 			return
 		}
-		if userInfo.Id != 0 {
-			now := time.Now().Format("2006-01-02 15:04:05")
-			_, err := common.GameConfInfo.Db.Exec("UPDATE account SET updated_date = ? WHERE id = ?", now, userInfo.Id)
-			if err != nil {
-				msg = fmt.Sprintf("user [%v] update err: %v", account, err)
-				logs.Error(msg)
-				return
-			}
-		}
-
-		cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(int(userInfo.Id)), HttpOnly: true, MaxAge: 86400}
-		http.SetCookie(w, &cookie)
-		cookie = http.Cookie{Name: "username", Value: userInfo.Username, HttpOnly: true, MaxAge: 86400}
-		http.SetCookie(w, &cookie)
-
-		data = userInfo
-	} else {
-		msg = fmt.Sprintf("user [%v] request err: user does not exist", account)
-		logs.Debug(msg)
 	}
+
+	cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(userInfo.Id), HttpOnly: true, MaxAge: 86400}
+	http.SetCookie(w, &cookie)
+	cookie = http.Cookie{Name: "username", Value: userInfo.Username, HttpOnly: true, MaxAge: 86400}
+	http.SetCookie(w, &cookie)
+
+	data = userInfo
 }

@@ -10,13 +10,11 @@ import (
 )
 
 func LoginOut(w http.ResponseWriter, r *http.Request) {
-	var msg string = "ok"
+	var msg = "ok"
 
 	defer func() {
 		res := common.Response{
-			0,
-			msg,
-			nil,
+			Msg: msg,
 		}
 		if msg != "ok" {
 			res.Code = 20001
@@ -39,11 +37,13 @@ func LoginOut(w http.ResponseWriter, r *http.Request) {
 		logs.Error(msg)
 		return
 	}
-	row := common.GameConfInfo.Db.QueryRow("SELECT * FROM `account` WHERE username=? AND id=?", username.Value, userid.Value)
-	var account = common.Account{}
-	err = row.Scan(&account.Id, &account.Email, &account.Username, &account.Password, &account.Coin, &account.CreatedDate, &account.UpdateDate)
+	userData := map[string]interface{}{
+		"username": username.Value,
+		"id": userid.Value,
+	}
+	_, err = common.UserInfo(userData)
 	if err != nil {
-		msg = fmt.Sprintf("user err: %v", err)
+		msg = fmt.Sprintf("logout err: %v", err)
 		logs.Debug(msg)
 		return
 	} else {
