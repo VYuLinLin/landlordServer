@@ -1,6 +1,9 @@
 package common
 
 const (
+	ReqHeart = "1"
+	ResHeart = "2"
+
 	ReqCheat = 1
 	ResCheat = 2
 

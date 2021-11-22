@@ -10,12 +10,12 @@ import (
 type HandleFunc func(http.ResponseWriter, *http.Request)
 
 func init() {
-	http.HandleFunc("/", logPanics(controllers.Index))
 	http.HandleFunc("/login", logPanics(controllers.Login))
 	http.HandleFunc("/logout", logPanics(controllers.LoginOut))
 	http.HandleFunc("/register", logPanics(controllers.Register))
 
-	http.HandleFunc("/ws", service.ServeWs)
+	http.HandleFunc("/ws/", logPanics(service.ServeWs))
+	http.HandleFunc("/", logPanics(controllers.Index))
 
 	// 设置静态目录
 	static := http.FileServer(http.Dir("./static"))

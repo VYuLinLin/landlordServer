@@ -28,7 +28,17 @@ var (
 	upGrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
-		CheckOrigin:     func(r *http.Request) bool { return true },
+		CheckOrigin:     func(r *http.Request) bool {
+			if r.Method != "GET" {
+				logs.Error("method is not GET")
+				return false
+			}
+			if r.URL.Path != "/ws/" {
+				logs.Error("path error")
+				return false
+			}
+			return true
+		},
 	} //不验证origin
 )
 
@@ -79,17 +89,24 @@ func (c *Client) sendMsg(msg []interface{}) {
 		c.toRobot <- msg
 		return
 	}
-	msgByte, err := json.Marshal(msg)
-	if err != nil {
-		logs.Error("send msg [%v] marsha1 err:%v", string(msgByte), err)
-		return
+	var msgByte []byte
+	var err error
+	if msg[0] == common.ResHeart {
+		heart, _ := strconv.Atoi(common.ResHeart)
+		msgByte, _ = json.Marshal(heart)
+	} else {
+		msgByte, err = json.Marshal(msg)
+		if err != nil {
+			logs.Error("send msg [%v] marsha1 err:%v", string(msgByte), err)
+			return
+		}
 	}
 	err = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 	if err != nil {
 		logs.Error("send msg SetWriteDeadline [%v] err:%v", string(msgByte), err)
 		return
 	}
-	w, err := c.conn.NextWriter(websocket.TextMessage)
+	w, err := c.conn.NextWriter(websocket.BinaryMessage)
 	if err != nil {
 		err = c.conn.Close()
 		if err != nil {
@@ -100,7 +117,7 @@ func (c *Client) sendMsg(msg []interface{}) {
 	if err != nil {
 		logs.Error("Write msg [%v] err: %v", string(msgByte), err)
 	}
-	if err := w.Close(); err != nil {
+	if err = w.Close(); err != nil {
 		err = c.conn.Close()
 		if err != nil {
 			logs.Error("close err: %v", err)
@@ -146,20 +163,20 @@ func (c *Client) close() {
 //可能是因为版本问题，导致有些未处理的error
 func (c *Client) readPump() {
 	defer func() {
-		//logs.Debug("readPump exit")
+		logs.Debug("readPump exit")
 		c.conn.Close()
 		c.close()
-		if c.Room.AllowRobot {
-			if c.Table != nil {
-				for _, client := range c.Table.TableClients {
-					client.close()
-				}
-			}
-		}
+		//if c.Room.AllowRobot {
+		//	if c.Table != nil {
+		//		for _, client := range c.Table.TableClients {
+		//			client.close()
+		//		}
+		//	}
+		//}
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	//c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	//c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
@@ -167,6 +184,10 @@ func (c *Client) readPump() {
 				logs.Error("websocket user_id[%d] unexpected close error: %v", c.UserInfo.UserId, err)
 			}
 			return
+		}
+		if string(message) == common.ReqHeart {
+			c.sendMsg([]interface{}{common.ResHeart})
+			continue
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
 		var data []interface{}
@@ -185,23 +206,18 @@ func (c *Client) Ping() {
 	defer func() {
 		ticker.Stop()
 	}()
-	for {
-		select {
-		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
-			}
-		}
-	}
+	//for {
+	//	select {
+	//	case <-ticker.C:
+			//c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			//if err := c.conn.WriteMessage(websocket.BinaryMessage, []byte("11")); err != nil {
+			//	return
+			//}
+	//	}
+	//}
 }
 
 func ServeWs(w http.ResponseWriter, r *http.Request) {
-	conn, err := upGrader.Upgrade(w, r, nil)
-	if err != nil {
-		logs.Error("upgrader err:%v", err)
-		return
-	}
 	var userId int
 	var username string
 	cookie, err := r.Cookie("userid")
@@ -219,10 +235,16 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 		username = cookie.Value
 	}
 
+	conn, err := upGrader.Upgrade(w, r, w.Header())
+	if err != nil {
+		logs.Error("upgrade err:%v", err)
+		return
+	}
 	client := &Client{conn: conn, HandPokers: make([]int, 0, 21), UserInfo: &UserInfo{}}
 	if userId != 0 && username != "" {
 		client.UserInfo.UserId = UserId(userId)
 		client.UserInfo.Username = username
+		AddClient(client)
 		go client.readPump()
 		go client.Ping()
 		return

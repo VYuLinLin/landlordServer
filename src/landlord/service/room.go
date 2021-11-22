@@ -12,13 +12,25 @@ var (
 			1: {
 				RoomId:      1,
 				AllowRobot:  true,
-				EntranceFee: 200,
+				EntranceFee: 10,
 				Tables:      make(map[TableId]*Table),
 			},
 			2: {
 				RoomId:      2,
 				AllowRobot:  false,
-				EntranceFee: 200,
+				EntranceFee: 20,
+				Tables:      make(map[TableId]*Table),
+			},
+			3: {
+				RoomId:      3,
+				AllowRobot:  false,
+				EntranceFee: 30,
+				Tables:      make(map[TableId]*Table),
+			},
+			4: {
+				RoomId:      4,
+				AllowRobot:  false,
+				EntranceFee: 40,
 				Tables:      make(map[TableId]*Table),
 			},
 		},
@@ -34,11 +46,11 @@ type RoomManager struct {
 }
 
 type Room struct {
-	RoomId      RoomId
-	Lock        sync.RWMutex
-	AllowRobot  bool
-	Tables      map[TableId]*Table
-	EntranceFee int
+	RoomId      RoomId             `json:"room_id"`
+	Lock        sync.RWMutex       `json:"-"`
+	AllowRobot  bool               `json:"allow_robot"`
+	Tables      map[TableId]*Table `json:"-"`
+	EntranceFee int                `json:"entrance_fee"`
 }
 
 //新建牌桌

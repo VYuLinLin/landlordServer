@@ -2,6 +2,7 @@ package service
 
 import (
 	"landlord/common"
+	"strconv"
 
 	"github.com/astaxie/beego/logs"
 )
@@ -31,7 +32,11 @@ func wsRequest(data []interface{}, client *Client) {
 		client.sendMsg([]interface{}{common.ResLogin, client.UserInfo.UserId, client.UserInfo.Username})
 
 	case common.ReqRoomList:
-		client.sendMsg([]interface{}{common.ResRoomList})
+		var rooms []*Room
+		for _, room := range roomManager.Rooms {
+			rooms = append(rooms, room)
+		}
+		client.sendMsg([]interface{}{common.ResRoomList, rooms})
 
 	case common.ReqTableList:
 		client.sendRoomTables()
@@ -42,20 +47,27 @@ func wsRequest(data []interface{}, client *Client) {
 			return
 		}
 		var roomId int
-		if id, ok := data[1].(float64); ok {
-			roomId = int(id)
+		if id, ok := data[1].(string); ok {
+			roomId, _ = strconv.Atoi(id)
 		}
-		roomManager.Lock.RLock()
-		defer roomManager.Lock.RUnlock()
+		//roomManager.Lock.RLock()
+		//defer roomManager.Lock.RUnlock()
 		if room, ok := roomManager.Rooms[roomId]; ok {
 			client.Room = room
-			res := make([][2]int, 0)
-			for _, table := range client.Room.Tables {
-				if len(table.TableClients) < 3 {
-					res = append(res, [2]int{int(table.TableId), len(table.TableClients)})
+			var table *Table
+			for _, otherTable := range client.Room.Tables {
+				if len(otherTable.TableClients) < 3 {
+					table = otherTable
 				}
 			}
-			client.sendMsg([]interface{}{common.ResJoinRoom, res})
+			if table == nil {
+				table = client.Room.newTable(client)
+			}
+			//client.Room.Lock.RLock()
+			//defer client.Room.Lock.RUnlock()
+
+			table.joinTable(client)
+			//client.sendMsg([]interface{}{common.ResJoinRoom, res})
 		}
 
 	case common.ReqNewTable:
