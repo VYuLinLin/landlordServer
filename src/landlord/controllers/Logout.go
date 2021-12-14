@@ -3,10 +3,11 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
-	"landlord/common"
-	"net/http"
-
 	"github.com/astaxie/beego/logs"
+	"landlord/common"
+	"landlord/service"
+	"net/http"
+	"strconv"
 )
 
 func LoginOut(w http.ResponseWriter, r *http.Request) {
@@ -25,31 +26,25 @@ func LoginOut(w http.ResponseWriter, r *http.Request) {
 			logs.Error("")
 		}
 	}()
-	username, err := r.Cookie("username")
+
+	params := r.URL.Query()
+	userId, err := strconv.Atoi(params.Get("id"))
+	userName := params.Get("name")
+
 	if err != nil {
-		msg = fmt.Sprintf("request err: %v", err)
-		logs.Error(msg)
-		return
-	}
-	userid, err := r.Cookie("userid")
-	if err != nil {
-		msg = fmt.Sprintf("request err: %v", err)
+		msg = fmt.Sprintf("logout: id conversion err: %v", err)
 		logs.Error(msg)
 		return
 	}
 	userData := map[string]interface{}{
-		"username": username.Value,
-		"id": userid.Value,
+		"username": userName,
+		"id": userId,
 	}
 	_, err = common.UserInfo(userData)
 	if err != nil {
 		msg = fmt.Sprintf("logout err: %v", err)
 		logs.Debug(msg)
 		return
-	} else {
-		cookie := http.Cookie{Name: "userid", HttpOnly: true, MaxAge: -1}
-		http.SetCookie(w, &cookie)
-		cookie = http.Cookie{Name: "username", HttpOnly: true, MaxAge: -1}
-		http.SetCookie(w, &cookie)
 	}
+	service.DeleteClient(service.UserId(userId))
 }

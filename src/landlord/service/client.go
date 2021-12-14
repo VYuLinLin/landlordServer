@@ -21,7 +21,10 @@ const (
 	RoleFarmer   = 0
 	RoleLandlord = 1
 )
-
+const (
+	quit = iota
+	ingame
+)
 var (
 	newline  = []byte{'\n'}
 	space    = []byte{' '}
@@ -45,9 +48,9 @@ var (
 type UserId int
 
 type UserInfo struct {
-	UserId   UserId `json:"user_id"`
-	Username string `json:"username"`
-	Coin     int    `json:"coin"`
+	UserId   UserId
+	Username string
+	Coin     int
 	Role     int
 }
 
@@ -57,6 +60,7 @@ type Client struct {
 	Room       *Room
 	Table      *Table
 	HandPokers []int
+	Status		int
 	Ready      bool
 	IsCalled   bool    //是否叫完分
 	Next       *Client //链表
@@ -75,27 +79,68 @@ func (c *Client) reset() {
 
 //发送房间内已有的牌桌信息
 func (c *Client) sendRoomTables() {
-	res := make([][2]int, 0)
-	for _, table := range c.Room.Tables {
-		if len(table.TableClients) < 3 {
-			res = append(res, [2]int{int(table.TableId), len(table.TableClients)})
-		}
-	}
-	c.sendMsg([]interface{}{common.ResTableList, res})
+	//res := make([][2]int, 0)
+	//for _, table := range c.Room.Tables {
+	//	if len(table.TableClients) < 3 {
+	//		res = append(res, [2]int{int(table.TableId), len(table.TableClients)})
+	//	}
+	//}
+	//c.sendMsg([]interface{}{common.ResTableList, res})
 }
 
-func (c *Client) sendMsg(msg []interface{}) {
-	if c.IsRobot {
-		c.toRobot <- msg
-		return
+//func (c *Client) sendMsg(msg []interface{}) {
+//	if c.IsRobot {
+//		c.toRobot <- msg
+//		return
+//	}
+//	var msgByte []byte
+//	var err error
+//	if msg[0] == common.ResHeart {
+//		heart, _ := strconv.Atoi(common.ResHeart)
+//		msgByte, _ = json.Marshal(heart)
+//	} else {
+//		msgByte, err = json.Marshal(msg)
+//		if err != nil {
+//			logs.Error("send msg [%v] marsha1 err:%v", string(msgByte), err)
+//			return
+//		}
+//	}
+//	err = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+//	if err != nil {
+//		logs.Error("send msg SetWriteDeadline [%v] err:%v", string(msgByte), err)
+//		return
+//	}
+//	w, err := c.conn.NextWriter(websocket.BinaryMessage)
+//	if err != nil {
+//		err = c.conn.Close()
+//		if err != nil {
+//			logs.Error("close client err: %v", err)
+//		}
+//	}
+//	_, err = w.Write(msgByte)
+//	if err != nil {
+//		logs.Error("Write msg [%v] err: %v", string(msgByte), err)
+//	}
+//	if err = w.Close(); err != nil {
+//		err = c.conn.Close()
+//		if err != nil {
+//			logs.Error("close err: %v", err)
+//		}
+//	}
+//}
+func (c *Client) sendMsg(action string, code int, data interface{}) {
+	res := Response{
+		action,
+		code,
+		data,
 	}
 	var msgByte []byte
 	var err error
-	if msg[0] == common.ResHeart {
+	if action == common.ResHeart {
 		heart, _ := strconv.Atoi(common.ResHeart)
 		msgByte, _ = json.Marshal(heart)
 	} else {
-		msgByte, err = json.Marshal(msg)
+		msgByte, err = json.Marshal(res)
 		if err != nil {
 			logs.Error("send msg [%v] marsha1 err:%v", string(msgByte), err)
 			return
@@ -124,7 +169,6 @@ func (c *Client) sendMsg(msg []interface{}) {
 		}
 	}
 }
-
 //光比客户端
 func (c *Client) close() {
 	if c.Table != nil {
@@ -186,53 +230,38 @@ func (c *Client) readPump() {
 			return
 		}
 		if string(message) == common.ReqHeart {
-			c.sendMsg([]interface{}{common.ResHeart})
+			c.sendMsg(common.ResHeart, 0, nil)
 			continue
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		var data []interface{}
-		err = json.Unmarshal(message, &data)
+		req := Request{}
+		//var data []interface{}
+		err = json.Unmarshal(message, &req)
 		if err != nil {
 			logs.Error("message unmarsha1 err, user_id[%d] err:%v", c.UserInfo.UserId, err)
 		} else {
-			wsRequest(data, c)
+			wsRequest(req, c)
 		}
 	}
 }
 
-//心跳
-func (c *Client) Ping() {
-	ticker := time.NewTicker(pingPeriod)
-	defer func() {
-		ticker.Stop()
-	}()
-	//for {
-	//	select {
-	//	case <-ticker.C:
-			//c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			//if err := c.conn.WriteMessage(websocket.BinaryMessage, []byte("11")); err != nil {
-			//	return
-			//}
-	//	}
-	//}
+// websocket 关闭监听
+func (c *Client) setCloseHandler() {
+	c.conn.SetCloseHandler(func(code int, text string) error {
+		DeleteClient(c.UserInfo.UserId)
+		logs.Error("The user [%s] disabled the Websocket: code = %v", c.UserInfo.Username, code)
+		return nil
+	})
 }
 
 func ServeWs(w http.ResponseWriter, r *http.Request) {
-	var userId int
-	var username string
-	cookie, err := r.Cookie("userid")
+	params := r.URL.Query()
+	userId, err := strconv.Atoi(params.Get("id"))
+	userName := params.Get("name")
 
 	if err != nil {
-		logs.Error("get cookie err: %v", err)
-	} else {
-		userId, err = strconv.Atoi(cookie.Value)
-	}
-	cookie, err = r.Cookie("username")
-
-	if err != nil {
-		logs.Error("get cookie err: %v", err)
-	} else {
-		username = cookie.Value
+		logs.Error("id conversion err:%v", err)
+		return
 	}
 
 	conn, err := upGrader.Upgrade(w, r, w.Header())
@@ -241,12 +270,13 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	client := &Client{conn: conn, HandPokers: make([]int, 0, 21), UserInfo: &UserInfo{}}
-	if userId != 0 && username != "" {
+	if userId != 0 && userName != "" {
 		client.UserInfo.UserId = UserId(userId)
-		client.UserInfo.Username = username
+		client.UserInfo.Username = userName
+
 		AddClient(client)
+		client.setCloseHandler()
 		go client.readPump()
-		go client.Ping()
 		return
 	}
 	logs.Error("user need login first")

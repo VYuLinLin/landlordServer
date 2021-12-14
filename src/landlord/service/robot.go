@@ -9,11 +9,11 @@ import (
 func (c *Client) runRobot() {
 	for {
 		select {
-		case msg, ok := <-c.toServer:
-			if !ok {
-				return
-			}
-			wsRequest(msg, c)
+		//case msg, ok := <-c.toServer:
+		//	if !ok {
+		//		return
+		//	}
+		//	wsRequest(msg, c)
 		case msg, ok := <-c.toRobot:
 			if !ok {
 				return

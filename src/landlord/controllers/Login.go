@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"landlord/common"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/astaxie/beego/logs"
@@ -86,11 +85,6 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	cookie := http.Cookie{Name: "userid", Value: strconv.Itoa(userInfo.Id), HttpOnly: true, MaxAge: 86400}
-	http.SetCookie(w, &cookie)
-	cookie = http.Cookie{Name: "username", Value: userInfo.Username, HttpOnly: true, MaxAge: 86400}
-	http.SetCookie(w, &cookie)
 
 	data = userInfo
 }

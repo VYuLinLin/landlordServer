@@ -76,7 +76,13 @@ func (r *Room) newTable(client *Client) (table *Table) {
 	logs.Debug("create new table ok! allow robot :%v", r.AllowRobot)
 	return
 }
-
+// 离开房间
+func (r *Room) leaveRoom(c *Client, id TableId) {
+	if c.Status == quit && !c.Ready {
+		delete(r.Tables, id)
+		c.Room = nil
+	}
+}
 //func config()  {
 //	go func() {		//压测
 //		time.Sleep(time.Second * 3)

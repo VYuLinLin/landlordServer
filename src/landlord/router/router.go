@@ -32,9 +32,9 @@ func logPanics(f HandleFunc) HandleFunc {
 			}
 		}()
 		// 跨域请求时，允许头部携带cookie，设置后Access-Control-Allow-Origin值不能是“*”
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Allow-Origin", "http://172.21.165.80:7456")
-		//w.Header().Set("Access-Control-Allow-Origin", "*")
+		//w.Header().Set("Access-Control-Allow-Credentials", "true")
+		//w.Header().Set("Access-Control-Allow-Origin", "http://172.21.165.80:7456")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Content-Type", "application/json;charset=utf-8")
 		if req.Method == http.MethodOptions {
