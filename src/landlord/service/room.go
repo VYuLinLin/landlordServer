@@ -6,36 +6,34 @@ import (
 	"github.com/astaxie/beego/logs"
 )
 
-var (
-	roomManager = RoomManager{
-		Rooms: map[int]*Room{
-			1: {
-				RoomId:      1,
-				AllowRobot:  true,
-				EntranceFee: 10,
-				Tables:      make(map[TableId]*Table),
-			},
-			2: {
-				RoomId:      2,
-				AllowRobot:  false,
-				EntranceFee: 20,
-				Tables:      make(map[TableId]*Table),
-			},
-			3: {
-				RoomId:      3,
-				AllowRobot:  false,
-				EntranceFee: 30,
-				Tables:      make(map[TableId]*Table),
-			},
-			4: {
-				RoomId:      4,
-				AllowRobot:  false,
-				EntranceFee: 40,
-				Tables:      make(map[TableId]*Table),
-			},
+var roomManager = RoomManager{
+	Rooms: map[int]*Room{
+		1: {
+			RoomId:      1,
+			AllowRobot:  true,
+			EntranceFee: 10,
+			Tables:      map[TableId]*Table{},
 		},
-	}
-)
+		2: {
+			RoomId:      2,
+			AllowRobot:  false,
+			EntranceFee: 20,
+			Tables:      map[TableId]*Table{},
+		},
+		3: {
+			RoomId:      3,
+			AllowRobot:  false,
+			EntranceFee: 30,
+			Tables:      map[TableId]*Table{},
+		},
+		4: {
+			RoomId:      4,
+			AllowRobot:  false,
+			EntranceFee: 40,
+			Tables:      map[TableId]*Table{},
+		},
+	},
+}
 
 type RoomId int
 
@@ -78,9 +76,8 @@ func (r *Room) newTable(client *Client) (table *Table) {
 }
 // 离开房间
 func (r *Room) leaveRoom(c *Client, id TableId) {
-	if c.Status == quit && !c.Ready {
-		delete(r.Tables, id)
-		c.Room = nil
+	if c.Status == INVALID && !c.Ready {
+		//delete(r.Tables, id)
 	}
 }
 //func config()  {

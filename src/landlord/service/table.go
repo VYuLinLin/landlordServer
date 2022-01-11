@@ -14,10 +14,12 @@ import (
 type TableId int
 
 const (
-	GameWaitting = iota
-	GameCallScore
-	GamePlaying
-	GameEnd
+	GameWaitting       = iota
+	GamePushCard       // 发牌
+	GameCallScore      // 叫分
+	GameShowBottomCard // 显示底牌
+	GamePlaying        // 出牌
+	GameEnd            // 结束
 )
 
 type Table struct {
@@ -28,52 +30,101 @@ type Table struct {
 	TableClients map[UserId]*Client
 	GameManage   *GameManage
 }
-type TableInfo struct {
-	TableId		TableId `json:"table_id"`
-	State        int `json:"state"`
-	Creator		UserId `json:"creator"`
-	Clients		[]interface{} `json:"clients"`
+type TableData struct {
+	RoomId  RoomId        `json:"room_id"`
+	TableId TableId       `json:"table_id"`
+	State   int           `json:"state"`
+	Creator UserId        `json:"creator"`
+	Clients []interface{} `json:"clients"`
 }
+
+// 获取当前用户所在桌子的信息
+func (t *Table) getTableData(c *Client) {
+	var msg = "ok"
+	if msg != "ok" {
+		c.sendMsg(TableInfo, 500, msg)
+	} else {
+		var data = &TableData{
+			RoomId:  c.Room.RoomId,
+			TableId: t.TableId,
+			State:   t.State,
+			Creator: t.Creator.UserInfo.UserId,
+		}
+		//for _, user := range t.TableClients {
+		//	data.Clients = nil
+			var nextId UserId
+			for _, client := range t.TableClients {
+				if client.Next != nil {
+					nextId = client.Next.UserInfo.UserId
+				}
+				avatarUrl := ""
+				userData := map[string]interface{}{
+					"user_name":  client.UserInfo.Username,
+					"user_id":    client.UserInfo.UserId,
+					"coin":       client.UserInfo.Coin,
+					"role":       client.UserInfo.Role,
+					"status":     client.Status,
+					"next_id":    nextId,
+					"avatar_url": avatarUrl,
+				}
+				data.Clients = append(data.Clients, userData)
+			}
+
+			c.sendMsg(TableInfo, 200, data)
+		//}
+	}
+}
+
 //客户端加入牌桌
 func (t *Table) joinTable(c *Client) {
 	var msg = "ok"
 	defer func() {
 		if msg != "ok" {
-			c.sendMsg(RoomJoin, 500, msg)
+			c.sendMsg(RoomJoinSelf, 500, msg)
 		} else {
-			var data = &TableInfo{
-				TableId: t.TableId,
-				State: t.State,
-				Creator: t.Creator.UserInfo.UserId,
+			// 通知自己
+			data := map[string]int{
+				"room_id":  int(c.Room.RoomId),
+				"table_id": int(t.TableId),
+			}
+			c.sendMsg(RoomJoinSelf, 200, data)
+			c.Status = UNREADY
+
+			// 通知其他玩家
+			var nextId UserId
+			if c.Next != nil {
+				nextId = c.Next.UserInfo.UserId
+			}
+			userData := map[string]interface{}{
+				"user_name":  c.UserInfo.Username,
+				"user_id":    c.UserInfo.UserId,
+				"coin":       c.UserInfo.Coin,
+				"role":       c.UserInfo.Role,
+				"status":     c.Status,
+				"next_id":		nextId,
+				"avatar_url": "",
 			}
 			for _, client := range t.TableClients {
-				user := map[string]interface{}{
-					"user_name": client.UserInfo.Username,
-					"user_id": client.UserInfo.UserId,
-					"coin": client.UserInfo.Coin,
-					"role": client.UserInfo.Role,
+				if client.UserInfo.UserId == c.UserInfo.UserId {
+					continue
 				}
-				data.Clients = append(data.Clients, user)
+
+				client.sendMsg(RoomJoinOther, 200, userData)
 			}
-			c.sendMsg(RoomJoin, 200, data)
-			c.Status = ingame
 		}
 	}()
 	//t.Lock.Lock()
 	//defer t.Lock.Unlock()
-	if len(t.TableClients) > 2 {
+	if _, ok := t.TableClients[c.UserInfo.UserId]; ok {
+		return
+	}
+	if len(t.TableClients) > 3 {
 		msg = fmt.Sprintf("Player[%d] JOIN Table[%d] FULL", c.UserInfo.UserId, t.TableId)
 
 		logs.Error(msg)
 		return
 	}
 	logs.Debug("[%v] user [%v] request join t", c.UserInfo.UserId, c.UserInfo.Username)
-	if _, ok := t.TableClients[c.UserInfo.UserId]; ok {
-		//msg = fmt.Sprintf("[%v] user [%v] already in this t", c.UserInfo.UserId, c.UserInfo.Username)
-		//
-		//logs.Error(msg)
-		return
-	}
 
 	c.Table = t
 	//c.Ready = true
@@ -84,6 +135,9 @@ func (t *Table) joinTable(c *Client) {
 		}
 	}
 	t.TableClients[c.UserInfo.UserId] = c
+	if len(t.TableClients) == 1 {
+		t.Creator = c
+	}
 	//t.syncUser()
 	//if len(t.TableClients) == 3 {
 	//	c.Next = t.Creator
@@ -101,12 +155,28 @@ func (t *Table) joinTable(c *Client) {
 }
 
 func (t *Table) leaveTable(c *Client) {
-	if c.Status == quit && !c.Ready {
+	if c.Status == INVALID && !c.Ready {
 		t.State = GameWaitting
+		delete(t.TableClients, c.UserInfo.UserId)
 		c.Table = nil
 		c.Next = nil
+		if len(t.TableClients) == 0 {
+			t.Creator = nil
+			return
+		}
+		for _, client := range c.Table.TableClients {
+			if client.Next == c {
+				client.Next = nil
+			} else if c.Table.Creator == c {
+				c.Table.Creator = client
+			}
+			//if c.Table.Creator == c && c != client && client.Next != nil {
+			//	c.Table.Creator = client
+			//}
+		}
 	}
 }
+
 //加入机器人
 func (t *Table) addRobot(room *Room) {
 	logs.Debug("robot [%v] join t", fmt.Sprintf("ROBOT-%d", len(t.TableClients)))
@@ -127,6 +197,7 @@ func (t *Table) addRobot(room *Room) {
 		t.joinTable(client)
 	}
 }
+
 //生成随机robotID
 func (t *Table) getRobotID() (robot UserId) {
 	time.Sleep(time.Microsecond * 10)
@@ -145,6 +216,9 @@ func (t *Table) getRobotID() (robot UserId) {
 游戏顺序: 等待 =》 准备 =》 发牌 =》 抢地主（叫分） =》 显示底牌 =》 出牌 =》 游戏结束 =》 等待
 */
 func (t *Table) gameStart() {
+	if len(t.TableClients) < 3 {
+		return
+	}
 	for _, client := range t.TableClients {
 		if !client.Ready {
 			return
@@ -177,6 +251,7 @@ func (t *Table) dealPoker() {
 		client.sendMsg(TableDeal, 200, client.HandPokers)
 	}
 }
+
 // ShufflePokers 洗牌
 func (t *Table) ShufflePokers() {
 	logs.Debug("ShufflePokers")
@@ -211,8 +286,9 @@ func (t *Table) callPointsStart() {
 		}
 	}()
 }
+
 // 抢地主（叫分）
-func (t *Table) callPoints(id UserId, score int)  {
+func (t *Table) callPoints(id UserId, score int) {
 	data := map[string]int{
 		"user_id": int(id),
 		"score":   score,
@@ -229,7 +305,7 @@ func (t *Table) callPoints(id UserId, score int)  {
 	t.GameManage.MaxCallScoreTurn.IsCalled = true
 	t.GameManage.MaxCallScoreTurn = t.GameManage.MaxCallScoreTurn.Next
 }
-func (t *Table) stateUpdate(state int)  {
+func (t *Table) stateUpdate(state int) {
 	if t.State != state {
 		t.State = state
 		for _, client := range t.TableClients {

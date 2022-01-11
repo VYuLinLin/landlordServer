@@ -22,16 +22,22 @@ const (
 	RoleLandlord = 1
 )
 const (
-	quit = iota
-	ingame
+	INVALID = iota // 无效
+	UNREADY        // 未准备
+	ready          // 已准备
+	Calling        // 抢地主（叫分）
+	double         // 加倍
+	PLAYING        // 出牌阶段
+	over           // 游戏结束
 )
+
 var (
 	newline  = []byte{'\n'}
 	space    = []byte{' '}
 	upGrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
-		CheckOrigin:     func(r *http.Request) bool {
+		CheckOrigin: func(r *http.Request) bool {
 			if r.Method != "GET" {
 				logs.Error("method is not GET")
 				return false
@@ -60,7 +66,7 @@ type Client struct {
 	Room       *Room
 	Table      *Table
 	HandPokers []int
-	Status		int
+	Status     int
 	Ready      bool
 	IsCalled   bool    //是否叫完分
 	Next       *Client //链表
@@ -169,8 +175,10 @@ func (c *Client) sendMsg(action string, code int, data interface{}) {
 		}
 	}
 }
+
 //光比客户端
 func (c *Client) close() {
+	return
 	if c.Table != nil {
 		for _, client := range c.Table.TableClients {
 			if c.Table.Creator == c && c != client {
@@ -189,7 +197,7 @@ func (c *Client) close() {
 		}
 		if len(c.Table.TableClients) == 1 {
 			c.Table.Creator = nil
-			delete(c.Room.Tables, c.Table.TableId)
+			//delete(c.Room.Tables, c.Table.TableId)
 			return
 		}
 		delete(c.Table.TableClients, c.UserInfo.UserId)
@@ -208,7 +216,7 @@ func (c *Client) close() {
 func (c *Client) readPump() {
 	defer func() {
 		logs.Debug("readPump exit")
-		c.conn.Close()
+		//c.conn.Close()
 		c.close()
 		//if c.Room.AllowRobot {
 		//	if c.Table != nil {
@@ -227,7 +235,7 @@ func (c *Client) readPump() {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				logs.Error("websocket user_id[%d] unexpected close error: %v", c.UserInfo.UserId, err)
 			}
-			return
+			break
 		}
 		if string(message) == common.ReqHeart {
 			c.sendMsg(common.ResHeart, 0, nil)
@@ -274,8 +282,8 @@ func ServeWs(w http.ResponseWriter, r *http.Request) {
 		client.UserInfo.UserId = UserId(userId)
 		client.UserInfo.Username = userName
 
-		AddClient(client)
-		client.setCloseHandler()
+		client = AddClient(client)
+		//client.setCloseHandler()
 		go client.readPump()
 		return
 	}
