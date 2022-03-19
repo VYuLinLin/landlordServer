@@ -12,8 +12,8 @@ const (
 	TableUpdate      = "table/data/update" // 桌子状态
 	TableJoin        = "table/join"        // 进入桌子
 	PlayerReady      = "player/ready"      // 玩家准备
-	TableDeal        = "table/deal"        // 发牌
-	TableCallPoints  = "table/callPoints"  // 抢地主（叫分）
+	PlayerDeal       = "player/deal"        // 发牌
+	TableCallPoints  = "table/callPoints"  // 抢地主
 	PlayerCallPoints = "player/callPoints" // 玩家叫分
-
+	TableHoleCards = "table/holeCards" // 显示底牌
 )

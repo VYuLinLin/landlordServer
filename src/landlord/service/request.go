@@ -1,6 +1,7 @@
 package service
 
 import (
+	"sort"
 	"strconv"
 
 	"github.com/astaxie/beego/logs"
@@ -48,9 +49,16 @@ func wsRequest(r Request, client *Client) {
 		//defer roomManager.Lock.RUnlock()
 		if room, ok := roomManager.Rooms[roomId]; ok {
 			client.Room = room
-			for _, otherTable := range client.Room.Tables {
+			keys := []int{}
+			for k := range room.Tables {
+				keys = append(keys, int(k))
+			}
+			sort.Ints(keys)
+			for _, k := range keys {
+				otherTable := room.Tables[TableId(k)]
 				if len(otherTable.TableClients) < 3 {
 					table = otherTable
+					break
 				}
 			}
 			if table == nil {
@@ -63,11 +71,19 @@ func wsRequest(r Request, client *Client) {
 			//client.sendMsg([]interface{}{common.ResJoinRoom, res})
 		}
 	case RoomLeave:
+		if (client.Table == nil) {
+			var data = make(map[string]UserId)
+			data["userId"] = client.UserInfo.UserId
+			client.sendMsg(RoomLeave, 200, data)
+			return
+		}
 		if client.Status >= Calling || client.Table.State >= GamePushCard {
 			client.sendMsg(RoomLeave, 500, "游戏中不能离开房间！")
 			return
 		}
 		client.Status = INVALID
+		var userId = client.UserInfo.UserId
+		var table = client.Table
 		var tableId TableId
 		if client.Table != nil {
 			tableId = client.Table.TableId
@@ -77,12 +93,12 @@ func wsRequest(r Request, client *Client) {
 			client.Room.leaveRoom(client, tableId)
 		}
 		defer func() {
-			client.sendMsg(RoomLeave, 200, client.UserInfo.UserId)
-			if client.Table == nil {
-				return
-			}
-			for _, c := range client.Table.TableClients {
-				c.sendMsg(RoomLeave, 200, client.UserInfo.UserId)
+			var data = make(map[string]UserId)
+			data["userId"] = userId
+			client.sendMsg(RoomLeave, 200, data)
+			for _, c := range table.TableClients {
+				data["creatorId"] = table.Creator.UserInfo.UserId
+				c.sendMsg(RoomLeave, 200, data)
 			}
 		}()
 	case TableInfo:
@@ -103,7 +119,13 @@ func wsRequest(r Request, client *Client) {
 
 	case PlayerReady:
 		client.Ready = true
-		client.sendMsg(PlayerReady, 200, nil)
+		var data = make(map[UserId]bool)
+		for _, c := range client.Table.TableClients {
+			data[c.UserInfo.UserId] = c.Ready
+		}
+		for _, c := range client.Table.TableClients {
+			c.sendMsg(PlayerReady, 200, data)
+		}
 		go client.Table.gameStart()
 
 	case PlayerCallPoints:
@@ -112,10 +134,7 @@ func wsRequest(r Request, client *Client) {
 		if id, ok := data.(string); ok {
 			score, _ = strconv.Atoi(id)
 		}
-		if score > client.Table.GameManage.MaxCallScore {
-			client.Table.GameManage.MaxCallScore = score
-			client.Table.GameManage.MaxCallScoreTurn = client
-		}
+
 		//client.IsCalled = true
 		client.Table.callPoints(client.UserInfo.UserId, score)
 

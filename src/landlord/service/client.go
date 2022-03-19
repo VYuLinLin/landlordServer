@@ -6,6 +6,7 @@ import (
 	"landlord/common"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/astaxie/beego/logs"
@@ -73,6 +74,7 @@ type Client struct {
 	IsRobot    bool
 	toRobot    chan []interface{} //发送给robot的消息
 	toServer   chan []interface{} //robot发送给服务器
+	Mux sync.RWMutex
 }
 
 //重置状态
@@ -152,12 +154,14 @@ func (c *Client) sendMsg(action string, code int, data interface{}) {
 			return
 		}
 	}
-	err = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-	if err != nil {
-		logs.Error("send msg SetWriteDeadline [%v] err:%v", string(msgByte), err)
-		return
-	}
+	//err = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+	//if err != nil {
+	//	logs.Error("send msg SetWriteDeadline [%v] err:%v", string(msgByte), err)
+	//	return
+	//}
+	c.Mux.Lock()
 	w, err := c.conn.NextWriter(websocket.BinaryMessage)
+
 	if err != nil {
 		err = c.conn.Close()
 		if err != nil {
@@ -165,6 +169,8 @@ func (c *Client) sendMsg(action string, code int, data interface{}) {
 		}
 	}
 	_, err = w.Write(msgByte)
+	c.Mux.Unlock()
+
 	if err != nil {
 		logs.Error("Write msg [%v] err: %v", string(msgByte), err)
 	}

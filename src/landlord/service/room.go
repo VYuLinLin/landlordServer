@@ -76,7 +76,7 @@ func (r *Room) newTable(client *Client) (table *Table) {
 }
 // 离开房间
 func (r *Room) leaveRoom(c *Client, id TableId) {
-	if c.Status == INVALID && !c.Ready {
+	if c.Status == INVALID || !c.Ready {
 		//delete(r.Tables, id)
 	}
 }

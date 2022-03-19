@@ -63,6 +63,7 @@ func (t *Table) getTableData(c *Client) {
 					"user_id":    client.UserInfo.UserId,
 					"coin":       client.UserInfo.Coin,
 					"role":       client.UserInfo.Role,
+					"ready":     client.Ready,
 					"status":     client.Status,
 					"next_id":    nextId,
 					"avatar_url": avatarUrl,
@@ -108,7 +109,6 @@ func (t *Table) joinTable(c *Client) {
 				if client.UserInfo.UserId == c.UserInfo.UserId {
 					continue
 				}
-
 				client.sendMsg(RoomJoinOther, 200, userData)
 			}
 		}
@@ -151,11 +151,12 @@ func (t *Table) joinTable(c *Client) {
 	if len(t.TableClients) == 3 {
 		c.Next = t.Creator
 		t.State = GameWaitting
+		t.GameManage.FirstCallScore = t.Creator
 	}
 }
 
 func (t *Table) leaveTable(c *Client) {
-	if c.Status == INVALID && !c.Ready {
+	if c.Status == INVALID || !c.Ready {
 		t.State = GameWaitting
 		delete(t.TableClients, c.UserInfo.UserId)
 		c.Table = nil
@@ -164,15 +165,15 @@ func (t *Table) leaveTable(c *Client) {
 			t.Creator = nil
 			return
 		}
-		for _, client := range c.Table.TableClients {
-			if client.Next == c {
+		for _, client := range t.TableClients {
+			if len(t.TableClients) == 1 {
 				client.Next = nil
-			} else if c.Table.Creator == c {
-				c.Table.Creator = client
+				t.Creator = client
+			}else if client.Next == c {
+				client.Next = nil
+			} else if t.Creator == c {
+				t.Creator = client
 			}
-			//if c.Table.Creator == c && c != client && client.Next != nil {
-			//	c.Table.Creator = client
-			//}
 		}
 	}
 }
@@ -248,7 +249,7 @@ func (t *Table) dealPoker() {
 	for _, client := range t.TableClients {
 		sort.Ints(client.HandPokers)
 		//response[len(response)-1] = client.HandPokers
-		client.sendMsg(TableDeal, 200, client.HandPokers)
+		client.sendMsg(PlayerDeal, 200, client.HandPokers)
 	}
 }
 
@@ -272,19 +273,22 @@ func (t *Table) callPointsStart() {
 	//for id := range t.TableClients {
 	//	ids = append(ids, id)
 	//}
-	userId := t.GameManage.FirstCallScore.UserInfo.UserId
+	player := t.GameManage.FirstCallScore
+	//userId := t.GameManage.FirstCallScore.UserInfo.UserId
 	for _, client := range t.TableClients {
-		client.sendMsg(TableCallPoints, 200, userId)
+		client.sendMsg(TableCallPoints, 200, player.UserInfo.UserId)
 	}
-	go func() {
-		for i := 0; i < 3; i++ {
+	//t.GameManage.Turn = t.GameManage.FirstCallScore.Next
+	//go func() {
+	//	for i := 0; i < 3; i++ {
 			time.Sleep(10e9)
-			if t.State == GamePlaying {
+			player = t.GameManage.FirstCallScore
+			if t.State == GamePlaying || player.IsCalled {
 				return
 			}
-			t.callPoints(userId, 0)
-		}
-	}()
+			t.callPoints(player.UserInfo.UserId, 0)
+	//	}
+	//}()
 }
 
 // 抢地主（叫分）
@@ -293,18 +297,66 @@ func (t *Table) callPoints(id UserId, score int) {
 		"user_id": int(id),
 		"score":   score,
 	}
+	var playerClient *Client
 	for _, client := range t.TableClients {
 		if client.UserInfo.UserId == id {
+			client.IsCalled = true
+			playerClient = client
 			break
 		}
 		client.sendMsg(PlayerCallPoints, 200, data)
 	}
-	for _, client := range t.TableClients {
-		client.sendMsg(TableCallPoints, 200, t.GameManage.MaxCallScoreTurn.Next.UserInfo.UserId)
+
+	//t.GameManage.MaxCallScoreTurn.IsCalled = true
+	//t.GameManage.MaxCallScoreTurn = playerClient.Next
+	if score > t.GameManage.MaxCallScore {
+		t.GameManage.MaxCallScore = score
+		t.GameManage.MaxCallScoreTurn = playerClient
 	}
-	t.GameManage.MaxCallScoreTurn.IsCalled = true
-	t.GameManage.MaxCallScoreTurn = t.GameManage.MaxCallScoreTurn.Next
+
+	isCallEnd := score == 3 || t.allCalled()
+	if isCallEnd {
+		logs.Debug("call score end")
+		t.callEnd()
+		return
+	}
+	// 通知下一位叫地主
+	nextUser := playerClient.Next
+	for _, client := range t.TableClients {
+		client.sendMsg(TableCallPoints, 200, nextUser.UserInfo.UserId)
+	}
+	time.Sleep(10e9)
+	if !nextUser.IsCalled {
+		t.callPoints(nextUser.UserInfo.UserId, 0)
+	}
 }
+
+// 叫分阶段结束
+func (t *Table) callEnd() {
+	t.State = GamePlaying
+	if t.GameManage.MaxCallScoreTurn == nil || t.GameManage.MaxCallScore == 0 {
+		t.GameManage.MaxCallScoreTurn = t.GameManage.FirstCallScore
+		t.GameManage.MaxCallScore = 1
+		//return
+	}
+	t.GameManage.FirstCallScore = t.GameManage.FirstCallScore.Next
+	landLord := t.GameManage.MaxCallScoreTurn
+	landLord.UserInfo.Role = RoleLandlord
+	//t.GameManage.Turn = landLord
+	for _, poker := range t.GameManage.Pokers {
+		landLord.HandPokers = append(landLord.HandPokers, poker)
+	}
+	//res := []interface{}{common.ResShowPoker, landLord.UserInfo.UserId, t.GameManage.Pokers}
+	data := map[string]interface{}{
+		"table_state": t.State,
+		"landLord_id":  landLord.UserInfo.UserId,
+		"pokers": t.GameManage.Pokers,
+	}
+	for _, c := range t.TableClients {
+		c.sendMsg(TableHoleCards, 200, data)
+	}
+}
+
 func (t *Table) stateUpdate(state int) {
 	if t.State != state {
 		t.State = state
@@ -344,27 +396,6 @@ func (t *Table) gameOver(client *Client) {
 		//c.sendMsg(res)
 	}
 	logs.Debug("t[%d] game over", t.TableId)
-}
-
-//叫分阶段结束
-func (t *Table) callEnd() {
-	t.State = GamePlaying
-	t.GameManage.FirstCallScore = t.GameManage.FirstCallScore.Next
-	if t.GameManage.MaxCallScoreTurn == nil || t.GameManage.MaxCallScore == 0 {
-		t.GameManage.MaxCallScoreTurn = t.Creator
-		t.GameManage.MaxCallScore = 1
-		//return
-	}
-	landLord := t.GameManage.MaxCallScoreTurn
-	landLord.UserInfo.Role = RoleLandlord
-	t.GameManage.Turn = landLord
-	for _, poker := range t.GameManage.Pokers {
-		landLord.HandPokers = append(landLord.HandPokers, poker)
-	}
-	//res := []interface{}{common.ResShowPoker, landLord.UserInfo.UserId, t.GameManage.Pokers}
-	//for _, c := range t.TableClients {
-	//	c.sendMsg(res)
-	//}
 }
 
 func (t *Table) chat(client *Client, msg string) {
